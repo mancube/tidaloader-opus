@@ -196,14 +196,17 @@ async def download_file_async(track_id: int, stream_url: str, filepath: Path, fi
             print(f"\n[4/4] Writing metadata tags...")
             await write_metadata_tags(filepath, metadata)
         
+        # Move file to organized folder structure
+        final_path = await organize_file_by_metadata(filepath, metadata)
+        
         active_downloads[track_id] = {
             'progress': 100,
             'status': 'completed'
         }
         
-        file_size_mb = filepath.stat().st_size / 1024 / 1024
+        file_size_mb = final_path.stat().st_size / 1024 / 1024
         print(f"\n✓ Downloaded: {filename} ({file_size_mb:.2f} MB)")
-        print(f"  Location: {filepath}")
+        print(f"  Location: {final_path}")
         print(f"{'='*60}\n")
         
         await asyncio.sleep(2)
@@ -287,6 +290,79 @@ async def write_metadata_tags(filepath: Path, metadata: dict):
         print(f"  ⚠️  Failed to write metadata: {e}")
         import traceback
         traceback.print_exc()
+
+def sanitize_path_component(name: str) -> str:
+    """Sanitize a string to be used as a file/folder name"""
+    if not name:
+        return "Unknown"
+    
+    # Replace invalid characters with underscores
+    invalid_chars = r'<>:"/\\|?*'
+    for char in invalid_chars:
+        name = name.replace(char, '_')
+    
+    # Remove leading/trailing dots and spaces
+    name = name.strip('. ')
+    
+    # Limit length to avoid path length issues
+    if len(name) > 200:
+        name = name[:200].strip()
+    
+    return name or "Unknown"
+
+async def organize_file_by_metadata(temp_filepath: Path, metadata: dict) -> Path:
+    """
+    Organize file into Artist/Album/Song structure based on metadata
+    Returns the final file path
+    """
+    try:
+        # Get metadata values with fallbacks
+        artist = metadata.get('album_artist') or metadata.get('artist', 'Unknown Artist')
+        album = metadata.get('album', 'Unknown Album')
+        title = metadata.get('title', temp_filepath.stem)
+        track_number = metadata.get('track_number')
+        
+        # Sanitize path components
+        artist_folder = sanitize_path_component(artist)
+        album_folder = sanitize_path_component(album)
+        
+        # Build filename with optional track number
+        if track_number:
+            # Pad track number to 2 digits
+            track_str = str(track_number).zfill(2)
+            filename = f"{track_str} - {sanitize_path_component(title)}.flac"
+        else:
+            filename = f"{sanitize_path_component(title)}.flac"
+        
+        # Create full path: DOWNLOAD_DIR/Artist/Album/Song.flac
+        final_dir = DOWNLOAD_DIR / artist_folder / album_folder
+        final_path = final_dir / filename
+        
+        # Create directories if they don't exist
+        final_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check if file already exists at final location
+        if final_path.exists():
+            print(f"  ⚠️  File already exists at: {final_path}")
+            # Delete the temp file since final file already exists
+            if temp_filepath.exists() and temp_filepath != final_path:
+                temp_filepath.unlink()
+            return final_path
+        
+        # Move file to organized location
+        if temp_filepath != final_path:
+            import shutil
+            shutil.move(str(temp_filepath), str(final_path))
+            print(f"  ✓ Organized to: {artist_folder}/{album_folder}/{filename}")
+        
+        return final_path
+        
+    except Exception as e:
+        print(f"  ⚠️  Failed to organize file: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return original path if organization fails
+        return temp_filepath
 
 @app.get("/api")
 async def api_root():
@@ -838,20 +914,39 @@ async def download_track_server_side(
         
         print(f"✓ Stream URL: {stream_url[:60]}...")
         
-        filename = f"{request.artist} - {request.title}.flac"
-        filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
-        filepath = DOWNLOAD_DIR / filename
+        # Create temporary filename for initial download
+        temp_filename = f"{request.artist} - {request.title}.flac"
+        temp_filename = re.sub(r'[<>:"/\\|?*]', '_', temp_filename)
+        temp_filepath = DOWNLOAD_DIR / temp_filename
         
-        print(f"\n[3/4] Target file: {filepath}")
+        # Build expected final path for duplicate check
+        artist = metadata.get('album_artist') or metadata.get('artist', 'Unknown Artist')
+        album = metadata.get('album', 'Unknown Album')
+        title = metadata.get('title', request.title)
+        track_number = metadata.get('track_number')
         
-        if filepath.exists():
+        artist_folder = sanitize_path_component(artist)
+        album_folder = sanitize_path_component(album)
+        
+        if track_number:
+            track_str = str(track_number).zfill(2)
+            final_filename = f"{track_str} - {sanitize_path_component(title)}.flac"
+        else:
+            final_filename = f"{sanitize_path_component(title)}.flac"
+        
+        final_filepath = DOWNLOAD_DIR / artist_folder / album_folder / final_filename
+        
+        print(f"\n[3/4] Target file: {final_filepath}")
+        
+        # Check if file already exists at final location
+        if final_filepath.exists():
             print(f"⚠️  File already exists, skipping download")
             del active_downloads[request.track_id]
             return {
                 "status": "exists",
-                "filename": filename,
-                "path": str(filepath),
-                "message": f"File already exists: {filename}"
+                "filename": final_filename,
+                "path": str(final_filepath),
+                "message": f"File already exists: {artist_folder}/{album_folder}/{final_filename}"
             }
         
         active_downloads[request.track_id] = {
@@ -863,16 +958,16 @@ async def download_track_server_side(
             download_file_async,
             request.track_id,
             stream_url,
-            filepath,
-            filename,
-            metadata  # Pass metadata to download function
+            temp_filepath,  # Download to temp location first
+            temp_filename,
+            metadata  # Pass metadata to organize after download
         )
         
         return {
             "status": "downloading",
-            "filename": filename,
-            "path": str(filepath),
-            "message": f"Download started: {filename}"
+            "filename": final_filename,
+            "path": str(final_filepath),
+            "message": f"Download started: {artist_folder}/{album_folder}/{final_filename}"
         }
         
     except HTTPException:
