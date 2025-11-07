@@ -162,40 +162,58 @@ export function SearchBar() {
         </button>
       </div>
 
-      <div class="flex flex-wrap gap-4 p-4 bg-surface-alt rounded-lg border border-border-light">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            name="type"
-            value="track"
-            checked={searchType === "track"}
-            onChange={() => handleSearchTypeChange("track")}
-            class="w-4 h-4 text-primary focus:ring-primary"
-          />
-          <span class="text-sm font-medium text-text">Track</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            name="type"
-            value="album"
-            checked={searchType === "album"}
-            onChange={() => handleSearchTypeChange("album")}
-            class="w-4 h-4 text-primary focus:ring-primary"
-          />
-          <span class="text-sm font-medium text-text">Album</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            name="type"
-            value="artist"
-            checked={searchType === "artist"}
-            onChange={() => handleSearchTypeChange("artist")}
-            class="w-4 h-4 text-primary focus:ring-primary"
-          />
-          <span class="text-sm font-medium text-text">Artist</span>
-        </label>
+      <div class="flex flex-wrap gap-3 p-4 bg-surface-alt rounded-xl border border-border-light">
+        {["track", "album", "artist"].map((type) => (
+          <label
+            key={type}
+            class={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
+              searchType === type
+                ? "bg-primary text-white shadow-sm"
+                : "bg-surface hover:bg-background-alt border border-border"
+            }`}
+          >
+            <input
+              type="radio"
+              name="type"
+              value={type}
+              checked={searchType === type}
+              onChange={() => handleSearchTypeChange(type)}
+              class="hidden"
+            />
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              {type === "track" && (
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                />
+              )}
+              {type === "album" && (
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              )}
+              {type === "artist" && (
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              )}
+            </svg>
+            <span class="text-sm font-medium capitalize">{type}</span>
+          </label>
+        ))}
       </div>
 
       {error && (
@@ -267,37 +285,43 @@ function TrackResults({ results, selected, onToggle, onAddToQueue }) {
         )}
       </div>
 
-      <div class="space-y-2 max-h-[600px] overflow-y-auto">
+      <div class="space-y-3 max-h-[600px] overflow-y-auto">
         {results.map((track) => (
           <label
             key={track.id}
-            class="flex items-center gap-3 p-3 bg-surface-alt hover:bg-background-alt rounded-lg border border-border-light cursor-pointer transition-all duration-200"
+            class={`search-result-card ${
+              selected.has(track.id) ? "selected" : ""
+            }`}
           >
             <input
               type="checkbox"
               checked={selected.has(track.id)}
               onChange={() => onToggle(track.id)}
-              class="w-4 h-4 text-primary focus:ring-primary rounded"
+              class="custom-checkbox"
             />
             {track.cover && (
               <img
                 src={api.getCoverUrl(track.cover, "80")}
                 alt={track.title}
-                class="w-12 h-12 rounded object-cover flex-shrink-0"
+                class="w-14 h-14 rounded-lg object-cover flex-shrink-0 shadow-sm"
               />
             )}
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-text truncate">
+              <p class="text-sm font-semibold text-text truncate">
                 {track.title}
               </p>
-              <p class="text-xs text-text-muted truncate">
+              <p class="text-xs text-text-muted truncate mt-1">
                 {track.artist}
                 {track.album && ` • ${track.album}`}
-                {track.duration && ` • ${formatDuration(track.duration)}`}
               </p>
+              {track.duration && (
+                <p class="text-xs text-text-muted mt-1">
+                  {formatDuration(track.duration)}
+                </p>
+              )}
             </div>
             {track.quality && (
-              <span class="px-2 py-1 bg-primary text-white text-xs font-semibold rounded flex-shrink-0">
+              <span class="px-3 py-1 bg-primary text-white text-xs font-semibold rounded-full flex-shrink-0">
                 {track.quality}
               </span>
             )}

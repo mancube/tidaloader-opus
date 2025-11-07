@@ -2,7 +2,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import { SearchBar } from "./components/SearchBar";
 import { TroiGenerator } from "./components/TroiGenerator";
-import { DownloadQueue } from "./components/DownloadQueue";
+import { DownloadQueuePopout } from "./components/DownloadQueuePopout";
 import { QualitySelector } from "./components/QualitySelector";
 import { Toast } from "./components/Toast";
 
@@ -11,8 +11,9 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   return (
-    <div class="min-h-screen bg-background">
+    <div class="min-h-screen bg-background pb-8">
       <Toast />
+      <DownloadQueuePopout />
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 class="text-2xl sm:text-3xl font-bold text-text">
@@ -46,7 +47,7 @@ export function App() {
         </header>
 
         {showSettings && (
-          <div class="card p-6 mb-6">
+          <div class="card p-6 mb-6 animate-slide-up">
             <QualitySelector />
           </div>
         )}
@@ -78,10 +79,6 @@ export function App() {
           {activeTab === "search" && <SearchBar />}
           {activeTab === "troi" && <TroiGenerator />}
         </main>
-
-        <footer>
-          <DownloadQueue />
-        </footer>
       </div>
     </div>
   );
