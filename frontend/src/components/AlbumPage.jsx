@@ -2,6 +2,7 @@ import { h } from "preact";
 import { useState, useEffect } from "preact/hooks";
 import { api } from "../api/client";
 import { useDownloadStore } from "../stores/downloadStore";
+import { useToastStore } from "../stores/toastStore";
 
 export function AlbumPage({ albumId, onBack }) {
   const [loading, setLoading] = useState(true);
@@ -11,6 +12,7 @@ export function AlbumPage({ albumId, onBack }) {
   const [error, setError] = useState(null);
 
   const addToQueue = useDownloadStore((state) => state.addToQueue);
+  const addToast = useToastStore((state) => state.addToast);
 
   useEffect(() => {
     loadAlbumData();
@@ -62,6 +64,7 @@ export function AlbumPage({ albumId, onBack }) {
     } catch (err) {
       console.error("Failed to load album:", err);
       setError(err.message);
+      addToast(`Failed to load album: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }
@@ -97,7 +100,10 @@ export function AlbumPage({ albumId, onBack }) {
       }));
 
     addToQueue(selectedTrackList);
-    alert(`Added ${selectedTrackList.length} tracks to download queue!`);
+    addToast(
+      `Added ${selectedTrackList.length} tracks to download queue`,
+      "success"
+    );
   };
 
   if (loading && !album) {

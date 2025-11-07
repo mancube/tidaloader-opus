@@ -2,6 +2,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import { api } from "../api/client";
 import { useDownloadStore } from "../stores/downloadStore";
+import { useToastStore } from "../stores/toastStore";
 
 export function TroiGenerator() {
   const [username, setUsername] = useState("");
@@ -11,6 +12,7 @@ export function TroiGenerator() {
   const [error, setError] = useState(null);
 
   const addToQueue = useDownloadStore((state) => state.addToQueue);
+  const addToast = useToastStore((state) => state.addToast);
 
   const handleGenerate = async (type) => {
     if (!username.trim()) {
@@ -31,8 +33,16 @@ export function TroiGenerator() {
         result.tracks.filter((t) => t.tidal_exists).map((t) => t.tidal_id)
       );
       setSelected(autoSelected);
+
+      const playlistType =
+        type === "daily-jams" ? "Daily Jams" : "Periodic Jams";
+      addToast(
+        `Generated ${playlistType} playlist with ${result.tracks.length} tracks`,
+        "success"
+      );
     } catch (err) {
       setError(err.message);
+      addToast(`Failed to generate playlist: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }
@@ -61,7 +71,10 @@ export function TroiGenerator() {
   const handleDownload = () => {
     const selectedTracks = tracks.filter((t) => selected.has(t.tidal_id));
     addToQueue(selectedTracks);
-    alert(`Added ${selectedTracks.length} tracks to download queue!`);
+    addToast(
+      `Added ${selectedTracks.length} tracks to download queue`,
+      "success"
+    );
   };
 
   return (

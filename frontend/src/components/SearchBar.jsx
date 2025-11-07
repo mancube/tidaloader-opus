@@ -2,6 +2,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import { api } from "../api/client";
 import { useDownloadStore } from "../stores/downloadStore";
+import { useToastStore } from "../stores/toastStore";
 import { ArtistPage } from "./ArtistPage";
 import { AlbumPage } from "./AlbumPage";
 
@@ -14,6 +15,7 @@ export function SearchBar() {
   const [error, setError] = useState(null);
 
   const addToQueue = useDownloadStore((state) => state.addToQueue);
+  const addToast = useToastStore((state) => state.addToast);
 
   const handleSearchTypeChange = async (newType) => {
     const previousType = searchType;
@@ -56,9 +58,18 @@ export function SearchBar() {
 
       if (result.items.length === 0) {
         setError("No results found");
+        addToast("No results found for your search", "info");
+      } else {
+        addToast(
+          `Found ${result.items.length} ${activeType}${
+            result.items.length !== 1 ? "s" : ""
+          }`,
+          "success"
+        );
       }
     } catch (err) {
       setError(err.message);
+      addToast(`Search failed: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }
@@ -92,7 +103,10 @@ export function SearchBar() {
       }));
 
     addToQueue(selectedTracks);
-    alert(`Added ${selectedTracks.length} tracks to download queue!`);
+    addToast(
+      `Added ${selectedTracks.length} tracks to download queue`,
+      "success"
+    );
     setSelected(new Set());
   };
 

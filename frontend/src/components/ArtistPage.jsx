@@ -2,6 +2,7 @@ import { h } from "preact";
 import { useState, useEffect } from "preact/hooks";
 import { api } from "../api/client";
 import { useDownloadStore } from "../stores/downloadStore";
+import { useToastStore } from "../stores/toastStore";
 
 export function ArtistPage({ artistId, onBack }) {
   const [loading, setLoading] = useState(true);
@@ -13,6 +14,7 @@ export function ArtistPage({ artistId, onBack }) {
   const [error, setError] = useState(null);
 
   const addToQueue = useDownloadStore((state) => state.addToQueue);
+  const addToast = useToastStore((state) => state.addToast);
 
   useEffect(() => {
     loadArtistData();
@@ -42,6 +44,7 @@ export function ArtistPage({ artistId, onBack }) {
     } catch (err) {
       console.error("Failed to load artist:", err);
       setError(err.message);
+      addToast(`Failed to load artist: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }
@@ -95,14 +98,14 @@ export function ArtistPage({ artistId, onBack }) {
       }));
 
     addToQueue(tracks);
-    alert(`Added ${tracks.length} tracks to download queue!`);
+    addToast(`Added ${tracks.length} tracks to download queue`, "success");
   };
 
   const handleDownloadAlbums = async () => {
     const albumsToDownload = albums.filter((a) => selectedAlbums.has(a.id));
 
     if (albumsToDownload.length === 0) {
-      alert("No albums selected");
+      addToast("No albums selected", "warning");
       return;
     }
 
@@ -126,12 +129,13 @@ export function ArtistPage({ artistId, onBack }) {
         totalTracks += tracks.length;
       }
 
-      alert(
-        `Added ${totalTracks} tracks from ${albumsToDownload.length} albums to queue!`
+      addToast(
+        `Added ${totalTracks} tracks from ${albumsToDownload.length} albums to queue`,
+        "success"
       );
       setSelectedAlbums(new Set());
     } catch (err) {
-      alert(`Failed to fetch album tracks: ${err.message}`);
+      addToast(`Failed to fetch album tracks: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }
@@ -139,20 +143,19 @@ export function ArtistPage({ artistId, onBack }) {
 
   const handleDownloadDiscography = async () => {
     if (albums.length === 0) {
-      alert("No albums found for this artist");
+      addToast("No albums found for this artist", "warning");
       return;
     }
-
-    const confirmDownload = confirm(
-      `Download entire discography? (${albums.length} albums)`
-    );
-
-    if (!confirmDownload) return;
 
     setLoading(true);
     let totalTracks = 0;
 
     try {
+      addToast(
+        `Downloading entire discography (${albums.length} albums)...`,
+        "info"
+      );
+
       for (const album of albums) {
         console.log(`Fetching tracks for album: ${album.title}`);
         const result = await api.get(`/album/${album.id}/tracks`);
@@ -171,11 +174,12 @@ export function ArtistPage({ artistId, onBack }) {
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
 
-      alert(
-        `Added entire discography: ${totalTracks} tracks from ${albums.length} albums!`
+      addToast(
+        `Added entire discography: ${totalTracks} tracks from ${albums.length} albums`,
+        "success"
       );
     } catch (err) {
-      alert(`Failed to fetch discography: ${err.message}`);
+      addToast(`Failed to fetch discography: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }

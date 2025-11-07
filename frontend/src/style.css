@@ -37,3 +37,20 @@
     @apply bg-surface rounded-xl shadow-sm border border-border-light hover:shadow-md hover:-translate-y-1 transition-all duration-200 cursor-pointer;
   }
 }
+
+@layer utilities {
+  @keyframes slide-in {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+  }
+}

@@ -4,6 +4,7 @@ import { SearchBar } from "./components/SearchBar";
 import { TroiGenerator } from "./components/TroiGenerator";
 import { DownloadQueue } from "./components/DownloadQueue";
 import { QualitySelector } from "./components/QualitySelector";
+import { Toast } from "./components/Toast";
 
 export function App() {
   const [activeTab, setActiveTab] = useState("search");
@@ -11,6 +12,7 @@ export function App() {
 
   return (
     <div class="min-h-screen bg-background">
+      <Toast />
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 class="text-2xl sm:text-3xl font-bold text-text">
