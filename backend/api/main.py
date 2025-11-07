@@ -17,7 +17,8 @@ import json
 import aiohttp
 import os
 from dotenv import load_dotenv
-from mutagen.flac import FLAC, Picture  # Add this line
+from mutagen.flac import FLAC, Picture
+from lyrics_client import lyrics_client
 
 load_dotenv()
 
@@ -265,6 +266,39 @@ async def write_metadata_tags(filepath: Path, metadata: dict):
             audio['MUSICBRAINZ_ARTISTID'] = metadata['musicbrainz_artistid']
         if metadata.get('musicbrainz_albumartistid'):
             audio['MUSICBRAINZ_ALBUMARTISTID'] = metadata['musicbrainz_albumartistid']
+        
+        # Lyrics - fetch from LrcLib
+        if metadata.get('title') and metadata.get('artist'):
+            try:
+                print(f"  🎤 Fetching lyrics...")
+                lyrics_result = await lyrics_client.get_lyrics(
+                    track_name=metadata['title'],
+                    artist_name=metadata['artist'],
+                    album_name=metadata.get('album'),
+                    duration=metadata.get('duration')
+                )
+                
+                if lyrics_result:
+                    # Prefer synced lyrics (LRC format)
+                    if lyrics_result.synced_lyrics:
+                        audio['LYRICS'] = lyrics_result.synced_lyrics
+                        print(f"  ✓ Added synced lyrics (LRC format)")
+                    elif lyrics_result.plain_lyrics:
+                        audio['LYRICS'] = lyrics_result.plain_lyrics
+                        print(f"  ✓ Added plain lyrics")
+                    
+                    # Also save lyrics to separate .lrc file for players that support it
+                    if lyrics_result.synced_lyrics:
+                        lrc_path = filepath.with_suffix('.lrc')
+                        try:
+                            with open(lrc_path, 'w', encoding='utf-8') as f:
+                                f.write(lyrics_result.synced_lyrics)
+                            print(f"  ✓ Saved synced lyrics to .lrc file")
+                        except Exception as e:
+                            print(f"  ⚠️  Failed to save .lrc file: {e}")
+                    
+            except Exception as e:
+                print(f"  ⚠️  Failed to fetch lyrics: {e}")
         
         # Cover art
         if metadata.get('cover_url'):
