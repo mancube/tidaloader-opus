@@ -9,10 +9,10 @@ export function App() {
 
   return (
     <div class="app">
-      <header class="header">
+      {/* <header class="header">
         <h1>🎵 Troi Tidal Downloader</h1>
         <button class="settings-btn">⚙️ Settings</button>
-      </header>
+      </header> */}
 
       <nav class="tabs">
         <button
