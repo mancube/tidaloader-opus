@@ -85,7 +85,7 @@ tidaloader/
 
 ## Docker Installation (Recommended)
 
-The easiest way to run SquidLoader Troi is using Docker. This works on Windows, macOS, and Linux.
+The easiest way to run Tidaloader is using Docker. This works on Windows, macOS, and Linux.
 
 ### Prerequisites
 
@@ -97,8 +97,8 @@ The easiest way to run SquidLoader Troi is using Docker. This works on Windows, 
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/RayZ3R0/squidloader-troi.git
-   cd squidloader-troi
+   git clone https://github.com/RayZ3R0/tidaloader.git
+   cd tidaloader
    ```
 
 2. **Create environment file**
