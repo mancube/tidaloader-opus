@@ -26,14 +26,14 @@ termux-wake-lock
 sleep 10
 
 # Start Tidal Troi UI
-cd ~/tidal-troi-ui
+cd ~/tidaloader
 ./start-service.sh
 EOF
 
 chmod +x ~/.termux/boot/start-tidal-troi.sh
-chmod +x ~/tidal-troi-ui/start-service.sh
-chmod +x ~/tidal-troi-ui/stop-service.sh
-chmod +x ~/tidal-troi-ui/restart-service.sh
+chmod +x ~/tidaloader/start-service.sh
+chmod +x ~/tidaloader/stop-service.sh
+chmod +x ~/tidaloader/restart-service.sh
 
 echo "Service installed!"
 echo "The app will start automatically when you boot your device"

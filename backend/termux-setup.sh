@@ -10,16 +10,16 @@ pkg update -y
 pkg install -y python git nodejs-lts
 
 # Create directories
-mkdir -p ~/tidal-troi-ui
+mkdir -p ~/tidaloader
 mkdir -p ~/music/tidal-downloads
 
 # Clone repository if not exists
-if [ ! -d ~/tidal-troi-ui/.git ]; then
+if [ ! -d ~/tidaloader/.git ]; then
     cd ~
-    git clone https://github.com/RayZ3R0/tidal-troi-ui.git
+    git clone https://github.com/RayZ3R0/tidaloader.git
 fi
 
-cd ~/tidal-troi-ui
+cd ~/tidaloader
 
 # Backend setup
 cd backend

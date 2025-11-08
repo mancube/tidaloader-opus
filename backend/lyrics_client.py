@@ -20,7 +20,7 @@ class LyricsClient:
     """Async client for LrcLib API"""
     
     BASE_URL = "https://lrclib.net/api"
-    USER_AGENT = "tidal-troi-ui/1.0.0 (https://github.com/RayZ3R0/tidal-troi-ui)"
+    USER_AGENT = "tidaloader/1.0.0 (https://github.com/RayZ3R0/tidaloader)"
     
     def __init__(self):
         self.session = None
