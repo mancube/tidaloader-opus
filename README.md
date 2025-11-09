@@ -21,6 +21,10 @@ A full-stack web application for downloading high-quality music from Tidal with 
 - **Quality Selection**: Choose audio quality per download
 - **Authentication**: Secure login with credential management
 
+<img width="1904" height="1064" alt="image" src="https://github.com/user-attachments/assets/32a073ab-17c5-4027-afdc-ee9057d12ad7" />
+<img width="1904" height="1064" alt="image" src="https://github.com/user-attachments/assets/b7436550-17ca-494d-8b97-41f5b60c82c9" />
+
+
 ## Project Structure
 
 ```
