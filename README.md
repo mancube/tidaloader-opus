@@ -2,6 +2,17 @@ A full-stack web application for downloading high-quality music from Tidal with 
 
 Heavy inspired from https://github.com/uimaxbai/tidal-ui and using https://github.com/sachinsenal0x64/hifi
 
+> [!IMPORTANT]
+>
+> # Project Terms
+
+- We do not encourage piracy. This project is made purely for educational and personal use.
+  If you somehow download copyrighted content, you are solely responsible for complying with the relevant laws in your country.
+
+- The Tidaloader Project assumes no responsibility for any misuse or legal violations arising from the use of this project.
+
+- This project does not claim ownership of any music or audio content. All rights remain with their respective copyright holders. Users are encouraged to support artists and rights owners by maintaining a valid Tidal subscription. Tidaloader serves solely as a downloading interface for personal, non-commercial use.
+
 ## Features
 
 ### Core Functionality
