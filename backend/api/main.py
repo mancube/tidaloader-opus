@@ -17,9 +17,13 @@ import json
 import aiohttp
 import os
 import unicodedata
+import platform
 from dotenv import load_dotenv
 from mutagen.flac import FLAC, Picture
 from mutagen.mp4 import MP4, MP4Cover
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, APIC, ID3NoHeaderError
+from mutagen.easyid3 import EasyID3
 from lyrics_client import lyrics_client
 
 from api.auth import require_auth
@@ -154,6 +158,11 @@ print(f"Download directory: {DOWNLOAD_DIR}")
 active_downloads = {}
 troi_progress_queues = {}
 
+MP3_QUALITY_MAP = {
+    "MP3_128": 128,
+    "MP3_256": 256,
+}
+
 def extract_items(result, key: str) -> List:
     if not result:
         return []
@@ -227,6 +236,56 @@ def extract_stream_url(track_data) -> Optional[str]:
     
     return None
 
+async def transcode_to_mp3(source_path: Path, target_path: Path, bitrate_kbps: int):
+    try:
+        if platform.system() == "Windows":
+            import subprocess
+            result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(source_path),
+                    "-vn",
+                    "-codec:a",
+                    "libmp3lame",
+                    "-b:a",
+                    f"{bitrate_kbps}k",
+                    str(target_path),
+                ],
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode != 0:
+                error_output = result.stderr if result.stderr else "Unknown error"
+                raise Exception(f"FFmpeg failed: {error_output}")
+        else:
+            process = await asyncio.create_subprocess_exec(
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(source_path),
+                "-vn",
+                "-codec:a",
+                "libmp3lame",
+                "-b:a",
+                f"{bitrate_kbps}k",
+                str(target_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                error_output = stderr.decode() if stderr else "Unknown error"
+                raise Exception(f"FFmpeg failed: {error_output}")
+                
+    except FileNotFoundError:
+        raise Exception("ffmpeg not found. Please install ffmpeg and ensure it is on the PATH.")
+    except Exception as e:
+        raise Exception(f"Failed to transcode to MP3: {e}")
+
 async def search_track_with_fallback(artist: str, title: str, track_obj) -> bool:
     artist_fixed = fix_unicode(artist)
     title_fixed = fix_unicode(title)
@@ -278,6 +337,7 @@ async def search_track_with_fallback(artist: str, title: str, track_obj) -> bool
     return False
 
 async def download_file_async(track_id: int, stream_url: str, filepath: Path, filename: str, metadata: dict = None):
+    processed_path = filepath
     try:
         log_step("3/4", f"Downloading {filename}...")
         
@@ -315,10 +375,32 @@ async def download_file_async(track_id: int, stream_url: str, filepath: Path, fi
                             await asyncio.sleep(0.01)
         
         if metadata:
-            log_step("4/4", "Writing metadata tags...")
-            await write_metadata_tags(filepath, metadata)
+            if metadata.get('target_format') == 'mp3':
+                bitrate = metadata.get('bitrate_kbps', 256)
+                mp3_path = filepath.with_suffix('.mp3')
+                log_step("3.5/4", f"Transcoding to MP3 ({bitrate} kbps)...")
+                active_downloads[track_id] = {
+                    'progress': 95,
+                    'status': 'transcoding'
+                }
+                await transcode_to_mp3(filepath, mp3_path, bitrate)
+                processed_path = mp3_path
+                metadata['file_ext'] = '.mp3'
+                try:
+                    filepath.unlink()
+                except FileNotFoundError:
+                    pass
+                except Exception as exc:
+                    log_warning(f"Failed to remove intermediate file: {exc}")
+            else:
+                processed_path = filepath
+                metadata.setdefault('file_ext', filepath.suffix)
         
-        final_path = await organize_file_by_metadata(filepath, metadata)
+        if metadata:
+            log_step("4/4", "Writing metadata tags...")
+            await write_metadata_tags(processed_path, metadata)
+        
+        final_path = await organize_file_by_metadata(processed_path, metadata)
         
         active_downloads[track_id] = {
             'progress': 100,
@@ -326,7 +408,8 @@ async def download_file_async(track_id: int, stream_url: str, filepath: Path, fi
         }
         
         file_size_mb = final_path.stat().st_size / 1024 / 1024
-        log_success(f"Downloaded: {filename} ({file_size_mb:.2f} MB)")
+        display_name = final_path.name if final_path else filename
+        log_success(f"Downloaded: {display_name} ({file_size_mb:.2f} MB)")
         log_info(f"Location: {final_path}")
         print(f"{'='*60}\n")
         
@@ -351,6 +434,13 @@ async def download_file_async(track_id: int, stream_url: str, filepath: Path, fi
                 log_info(f"Cleaned up partial file: {filename}")
             except Exception:
                 pass
+        
+        if processed_path and processed_path != filepath and processed_path.exists():
+            try:
+                processed_path.unlink()
+                log_info(f"Cleaned up partial file: {processed_path.name}")
+            except Exception:
+                pass
 
 async def write_metadata_tags(filepath: Path, metadata: dict):
     try:
@@ -359,6 +449,7 @@ async def write_metadata_tags(filepath: Path, metadata: dict):
         
         is_flac = header[:4] == b'fLaC'
         is_m4a = header[4:8] == b'ftyp' or header[4:12] == b'ftypM4A '
+        is_mp3 = header[:3] == b'ID3' or filepath.suffix.lower() == '.mp3' or metadata.get('target_format') == 'mp3'
         
         quality = metadata.get('quality', 'UNKNOWN')
         
@@ -368,6 +459,9 @@ async def write_metadata_tags(filepath: Path, metadata: dict):
         elif is_m4a:
             log_info(f"File format: M4A/AAC ({quality})")
             await write_m4a_metadata(filepath, metadata)
+        elif is_mp3:
+            log_info(f"File format: MP3 ({quality})")
+            await write_mp3_metadata(filepath, metadata)
         else:
             log_warning(f"Unknown file format, skipping metadata")
             log_info(f"Header: {header.hex()}")
@@ -480,6 +574,76 @@ async def write_m4a_metadata(filepath: Path, metadata: dict):
         log_warning(f"Failed to write M4A metadata: {e}")
         raise
 
+async def write_mp3_metadata(filepath: Path, metadata: dict):
+    try:
+        audio = MP3(str(filepath), ID3=ID3)
+        if audio.tags is None:
+            audio.add_tags()
+            audio.save()
+        
+        try:
+            tags = EasyID3(str(filepath))
+        except ID3NoHeaderError:
+            audio.add_tags()
+            audio.save()
+            tags = EasyID3(str(filepath))
+        
+        if metadata.get('title'):
+            tags['title'] = metadata['title']
+        if metadata.get('artist'):
+            tags['artist'] = metadata['artist']
+        if metadata.get('album'):
+            tags['album'] = metadata['album']
+        if metadata.get('album_artist'):
+            tags['albumartist'] = metadata['album_artist']
+        if metadata.get('genre'):
+            tags['genre'] = metadata['genre']
+        if metadata.get('date'):
+            tags['date'] = metadata['date']
+        if metadata.get('track_number'):
+            track_num = metadata['track_number']
+            total_tracks = metadata.get('total_tracks')
+            if total_tracks:
+                tags['tracknumber'] = f"{track_num}/{total_tracks}"
+            else:
+                tags['tracknumber'] = str(track_num)
+        if metadata.get('disc_number'):
+            disc_num = metadata['disc_number']
+            total_discs = metadata.get('total_discs', 0)
+            tags['discnumber'] = f"{disc_num}/{total_discs}" if total_discs else str(disc_num)
+        
+        tags.save()
+        
+        await fetch_and_store_lyrics(filepath, metadata, None)
+        
+        if metadata.get('cover_url'):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(metadata['cover_url']) as response:
+                        if response.status == 200:
+                            image_data = await response.read()
+                            audio = MP3(str(filepath), ID3=ID3)
+                            if audio.tags is None:
+                                audio.add_tags()
+                            audio.tags.delall('APIC')
+                            audio.tags.add(APIC(
+                                encoding=3,
+                                mime='image/jpeg',
+                                type=3,
+                                desc='Cover',
+                                data=image_data
+                            ))
+                            audio.save()
+                            log_success("Added cover art")
+            except Exception as e:
+                log_warning(f"Failed to add cover art: {e}")
+        
+        log_success("MP3 metadata tags written")
+        
+    except Exception as e:
+        log_warning(f"Failed to write MP3 metadata: {e}")
+        raise
+
 async def fetch_and_store_lyrics(filepath: Path, metadata: dict, audio_file=None):
     if metadata.get('title') and metadata.get('artist'):
         try:
@@ -535,12 +699,10 @@ async def organize_file_by_metadata(temp_filepath: Path, metadata: dict) -> Path
         album = metadata.get('album', 'Unknown Album')
         title = metadata.get('title', temp_filepath.stem)
         track_number = metadata.get('track_number')
-        quality = metadata.get('quality', 'LOSSLESS')
-        
-        if quality in ['LOW', 'HIGH']:
-            file_ext = '.m4a'
-        else:
-            file_ext = '.flac'
+        file_ext = metadata.get('file_ext')
+        if not file_ext:
+            file_ext = temp_filepath.suffix or '.flac'
+        file_ext = file_ext if file_ext.startswith('.') else f".{file_ext}"
         
         artist_folder = sanitize_path_component(artist)
         album_folder = sanitize_path_component(album)
@@ -757,6 +919,7 @@ async def troi_progress_stream(
             "Content-Type": "text/event-stream; charset=utf-8"
         }
     )
+
 @app.get("/api/search/tracks")
 async def search_tracks(q: str, username: str = Depends(require_auth)):
     try:
@@ -1191,18 +1354,33 @@ async def download_track_server_side(
         print(f"  Quality: {request.quality}")
         print(f"{'='*60}\n")
         
+        requested_quality = request.quality.upper() if request.quality else "LOSSLESS"
+        
         active_downloads[request.track_id] = {
             'progress': 0,
             'status': 'starting'
         }
         
         log_step("1/4", "Getting track metadata...")
-        track_info = tidal_client.get_track(request.track_id, request.quality)
+        
+        is_mp3_request = requested_quality in MP3_QUALITY_MAP
+        source_quality = 'LOSSLESS' if is_mp3_request else requested_quality
+        
+        track_info = tidal_client.get_track(request.track_id, source_quality)
         if not track_info:
             del active_downloads[request.track_id]
             raise HTTPException(status_code=404, detail="Track not found")
         
-        metadata = {'quality': request.quality}
+        metadata = {
+            'quality': requested_quality,
+            'source_quality': source_quality
+        }
+        
+        if is_mp3_request:
+            metadata['target_format'] = 'mp3'
+            metadata['bitrate_kbps'] = MP3_QUALITY_MAP[requested_quality]
+            metadata['quality_label'] = requested_quality
+        
         if isinstance(track_info, list) and len(track_info) > 0:
             track_data = track_info[0]
         else:
@@ -1239,7 +1417,7 @@ async def download_track_server_side(
         if metadata.get('album'):
             log_info(f"Album: {metadata.get('album')}")
         
-        log_step("2/4", "Getting stream URL...")
+        log_step("2/4", f"Getting stream URL ({source_quality})...")
         stream_url = extract_stream_url(track_info)
         if not stream_url:
             del active_downloads[request.track_id]
@@ -1247,14 +1425,14 @@ async def download_track_server_side(
         
         log_success(f"Stream URL: {stream_url[:60]}...")
         
-        if request.quality in ['LOW', 'HIGH']:
-            file_ext = '.m4a'
-        else:
-            file_ext = '.flac'
+        download_ext = '.m4a' if source_quality in ['LOW', 'HIGH'] else '.flac'
+        final_ext = '.mp3' if is_mp3_request else download_ext
+        metadata['file_ext'] = final_ext
+        metadata['download_ext'] = download_ext
         
-        temp_filename = f"{request.artist} - {request.title}{file_ext}"
-        temp_filename = re.sub(r'[<>:"/\\|?*]', '_', temp_filename)
-        temp_filepath = DOWNLOAD_DIR / temp_filename
+        temp_download_name = f"{request.artist} - {request.title}{download_ext}"
+        temp_download_name = re.sub(r'[<>:"/\\|?*]', '_', temp_download_name)
+        temp_filepath = DOWNLOAD_DIR / temp_download_name
         
         artist = metadata.get('album_artist') or metadata.get('artist', 'Unknown Artist')
         album = metadata.get('album', 'Unknown Album')
@@ -1266,9 +1444,9 @@ async def download_track_server_side(
         
         if track_number:
             track_str = str(track_number).zfill(2)
-            final_filename = f"{track_str} - {sanitize_path_component(title)}{file_ext}"
+            final_filename = f"{track_str} - {sanitize_path_component(title)}{final_ext}"
         else:
-            final_filename = f"{sanitize_path_component(title)}{file_ext}"
+            final_filename = f"{sanitize_path_component(title)}{final_ext}"
         
         final_filepath = DOWNLOAD_DIR / artist_folder / album_folder / final_filename
         
@@ -1294,7 +1472,7 @@ async def download_track_server_side(
             request.track_id,
             stream_url,
             temp_filepath,
-            temp_filename,
+            final_filename,
             metadata
         )
         

@@ -4,7 +4,7 @@ A full-stack web application for downloading high-quality music from Tidal with 
 
 ### Core Functionality
 
-- **Tidal Music Downloads**: Download tracks in FLAC (lossless/hi-res) or AAC (320kbps/96kbps) formats
+- **Tidal Music Downloads**: Download tracks in FLAC (lossless/hi-res), MP3 (128kbps/256kbps), or AAC (320kbps/96kbps) formats
 - **Smart Playlist Generation**: Generate personalized playlists using ListenBrainz listening history via Troi
 - **Automatic Organization**: Files organized by Artist/Album with proper track numbering
 - **Rich Metadata**: Automatic ID3 tags, album artwork, and MusicBrainz IDs
@@ -21,9 +21,12 @@ A full-stack web application for downloading high-quality music from Tidal with 
 - **Quality Selection**: Choose audio quality per download
 - **Authentication**: Secure login with credential management
 
-<img width="1904" height="1064" alt="image" src="https://github.com/user-attachments/assets/32a073ab-17c5-4027-afdc-ee9057d12ad7" />
-<img width="1904" height="1064" alt="image" src="https://github.com/user-attachments/assets/b7436550-17ca-494d-8b97-41f5b60c82c9" />
+### Audio Quality Options
 
+- **Hi-Res FLAC** (`HI_RES_LOSSLESS`): Up to 24-bit/192kHz direct from Tidal
+- **Lossless FLAC** (`LOSSLESS`): 16-bit/44.1kHz archival quality
+- **MP3 256kbps / 128kbps** (`MP3_256`, `MP3_128`): Transcoded using ffmpeg/libmp3lame
+- **AAC 320kbps / 96kbps** (`HIGH`, `LOW`): Direct AAC streams from Tidal
 
 ## Project Structure
 
@@ -67,6 +70,7 @@ tidaloader/
 - Python 3.8+
 - Node.js 16+ and npm
 - Git
+- ffmpeg 4.0+ (for MP3 transcoding support)
 
 ### Platform-Specific
 
